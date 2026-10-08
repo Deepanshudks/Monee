@@ -16,18 +16,38 @@ import { useAppSounds } from "@/utils/sound";
 export function Onboarding({ onDone }: { onDone: () => void }) {
   const t = useTheme();
   const complete = useSettingsStore((s) => s.completeOnboarding);
-  const { play } = useAppSounds();
+  const sounds = useSettingsStore((s) => s.soundsEnabled);
+  const animeVoice = useSettingsStore((s) => s.animeVoiceEnabled);
+
+  const { play, playVoice } = useAppSounds(sounds, animeVoice);
   const [name, setName] = useState("");
   const [budget, setBudget] = useState("30000");
   const [busy, setBusy] = useState(false);
+
   const finish = async () => {
     const b = Number(budget.replace(/,/g, ""));
+
     if (!Number.isFinite(b) || b <= 0) return;
+
     setBusy(true);
-    await complete(name.trim() || "there", b);
-    play("success");
-    onDone();
+
+    try {
+      await complete(name.trim() || "there", b);
+
+      play("success");
+
+      if (animeVoice) {
+        playVoice("yosh");
+      }
+
+      onDone();
+    } catch (error) {
+      console.error("[Monee] Onboarding failed:", error);
+    } finally {
+      setBusy(false);
+    }
   };
+
   return (
     <View style={[s.root, { backgroundColor: t.background }]}>
       <View style={[s.glow, s.glow1, { backgroundColor: t.lavender + "55" }]} />

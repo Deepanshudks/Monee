@@ -6,19 +6,18 @@ import { useTheme } from "@/hooks/useTheme";
 export function BalanceHeader({
   budget,
   spent,
-  startingBalance,
+  carryForward,
 }: {
   budget: number;
   spent: number;
-  startingBalance: number;
+  carryForward: number;
 }) {
   const t = useTheme();
 
   const budgetRemaining = budget - spent;
-  const cashRemaining = startingBalance - spent;
-
   const negativeBudget = budgetRemaining < 0;
-  const negativeCash = cashRemaining < 0;
+
+  const baseBudget = budget - carryForward;
 
   const pct = budget > 0 ? Math.min(Math.max(spent / budget, 0), 1) : 0;
 
@@ -77,25 +76,25 @@ export function BalanceHeader({
 
       <View style={s.cashRow}>
         <View style={s.cashItem}>
-          <AppText style={s.cashLabel}>STARTING BALANCE</AppText>
+          <AppText style={s.cashLabel}>BASE BUDGET</AppText>
 
           <AppText style={[s.cashValue, { color: t.text }]}>
-            {formatINR(startingBalance)}
+            {formatINR(baseBudget)}
           </AppText>
         </View>
 
         <View style={s.cashItem}>
-          <AppText style={s.cashLabel}>CASH REMAINING</AppText>
+          <AppText style={s.cashLabel}>CARRY FORWARD</AppText>
 
           <AppText
             style={[
               s.cashValue,
               {
-                color: negativeCash ? t.danger : t.text,
+                color: carryForward < 0 ? t.danger : t.text,
               },
             ]}
           >
-            {formatINR(cashRemaining)}
+            {formatINR(carryForward)}
           </AppText>
         </View>
       </View>

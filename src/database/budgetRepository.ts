@@ -94,3 +94,9 @@ export async function upsertBudget(
     now,
   );
 }
+
+export async function clearBudgets(): Promise<void> {
+  const db = await getDatabase();
+
+  await db.runAsync("DELETE FROM budgets");
+}

@@ -11,6 +11,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { CATEGORIES, type Expense } from "@/types/finance";
 import { dayLabel, monthKey, monthLabel } from "@/utils/dates";
 import { formatINR } from "@/utils/currency";
+import { monthlySummary } from "@/utils/calculations";
 
 export default function Activity() {
   const t = useTheme();
@@ -26,19 +27,28 @@ export default function Activity() {
   const [picker, setPicker] = useState(false);
   const [editing, setEditing] = useState<Expense>();
 
-  const monthFinance = monthlyBudgets[month];
-
-  const monthExpenses = useMemo(
+  const budgetValues = useMemo(
     () =>
-      expenses
-        .filter((e) => e.month === month)
-        .reduce((total, e) => total + e.amount, 0),
-    [expenses, month],
+      Object.fromEntries(
+        Object.entries(monthlyBudgets).map(([key, value]) => [
+          key,
+          value.budget,
+        ]),
+      ),
+    [monthlyBudgets],
   );
 
-  const budgetRemaining = (monthFinance?.budget ?? 0) - monthExpenses;
+  const summary = useMemo(
+    () => monthlySummary(expenses, budgetValues, month),
+    [expenses, budgetValues, month],
+  );
 
-  const cashRemaining = (monthFinance?.startingBalance ?? 0) - monthExpenses;
+  const monthExpenses = summary.expenses;
+
+  const budgetRemaining = summary.remaining;
+
+  const cashRemaining = summary.remaining;
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     let a = expenses.filter(
@@ -117,7 +127,7 @@ export default function Activity() {
           <AppText style={s.summaryLabel}>BUDGET</AppText>
 
           <AppText style={[s.summaryValue, { color: t.text }]}>
-            {formatINR(monthFinance?.budget ?? 0)}
+            {formatINR(summary.budget)}
           </AppText>
         </View>
 

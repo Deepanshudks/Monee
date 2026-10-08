@@ -1,4 +1,5 @@
 import {
+  Alert,
   Modal,
   View,
   TextInput,
@@ -20,6 +21,7 @@ import {
 import { useFinanceStore } from "@/stores/financeStore";
 import * as Haptics from "expo-haptics";
 import { useAppSounds } from "@/utils/sound";
+import { useSettingsStore } from "@/stores/settingsStore";
 
 export function ExpenseSheet({
   visible,
@@ -35,7 +37,10 @@ export function ExpenseSheet({
   const t = useTheme();
   const add = useFinanceStore((s) => s.addExpense);
   const update = useFinanceStore((s) => s.updateExpense);
-  const { play } = useAppSounds();
+  const sounds = useSettingsStore((s) => s.soundsEnabled);
+  const animeVoice = useSettingsStore((s) => s.animeVoiceEnabled);
+  const deleteExpense = useFinanceStore((s) => s.deleteExpense);
+  const { play, playVoice } = useAppSounds(sounds, animeVoice);
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState<ExpenseCategory>("Food");
@@ -55,14 +60,67 @@ export function ExpenseSheet({
     }
   }, [visible, expense, month]);
 
+  const remove = () => {
+    if (!expense) return;
+
+    Alert.alert(
+      "Delete expense?",
+      `Remove "${expense.description || expense.category}"?`,
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setSaving(true);
+
+              await deleteExpense(expense.id);
+
+              try {
+                await Haptics.notificationAsync(
+                  Haptics.NotificationFeedbackType.Warning,
+                );
+              } catch {}
+
+              try {
+                play("delete");
+
+                if (animeVoice) {
+                  playVoice("sayonara");
+                }
+              } catch {}
+
+              onClose();
+            } catch (error) {
+              console.error("[Monee] Failed to delete expense:", error);
+
+              Alert.alert(
+                "Couldn't delete expense",
+                error instanceof Error
+                  ? error.message
+                  : "Something went wrong while deleting the expense.",
+              );
+            } finally {
+              setSaving(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const save = async () => {
-    const n = Number(amount.replace(/,/g, ""));
+    const n = Number(amount.replace(/,/g, "").trim());
 
     const isValidDate = /^\d{4}-\d{2}-\d{2}$/.test(date);
-
     const safeDate = isValidDate ? date : `${month}-01`;
 
     if (!Number.isFinite(n) || n <= 0) {
+      Alert.alert("Invalid amount", "Please enter a valid expense amount.");
       return;
     }
 
@@ -88,11 +146,34 @@ export function ExpenseSheet({
         });
       }
 
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      try {
+        await Haptics.notificationAsync(
+          Haptics.NotificationFeedbackType.Success,
+        );
+      } catch (error) {
+        console.warn("[Monee] Haptics failed:", error);
+      }
 
-      play("success");
+      try {
+        play("expense");
+
+        if (!expense && animeVoice) {
+          playVoice("yatta");
+        }
+      } catch (error) {
+        console.warn("[Monee] Sound failed:", error);
+      }
 
       onClose();
+    } catch (error) {
+      console.error("[Monee] Failed to save expense:", error);
+
+      Alert.alert(
+        "Couldn't save expense",
+        error instanceof Error
+          ? error.message
+          : "Something went wrong while saving the expense.",
+      );
     } finally {
       setSaving(false);
     }
@@ -186,6 +267,24 @@ export function ExpenseSheet({
             onPress={save}
             disabled={saving || !amount}
           />
+
+          {expense && (
+            <Pressable
+              onPress={remove}
+              disabled={saving}
+              style={({ pressed }) => [
+                s.deleteButton,
+                {
+                  borderColor: t.danger,
+                  opacity: pressed || saving ? 0.6 : 1,
+                },
+              ]}
+            >
+              <AppText style={[s.deleteText, { color: t.danger }]}>
+                Delete expense
+              </AppText>
+            </Pressable>
+          )}
         </View>
       </KeyboardAvoidingView>
     </Modal>
@@ -200,6 +299,19 @@ const s = StyleSheet.create({
     bottom: 0,
     left: 0,
     backgroundColor: "rgba(0,0,0,0.38)",
+  },
+  deleteButton: {
+    height: 48,
+    borderWidth: 1,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: -4,
+  },
+
+  deleteText: {
+    fontSize: 14,
+    fontWeight: "700",
   },
   sheet: {
     paddingHorizontal: 20,

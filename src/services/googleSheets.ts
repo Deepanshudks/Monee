@@ -2,7 +2,6 @@ import type { Expense } from "@/types/finance";
 
 export type MonthlyFinance = {
   budget: number;
-  startingBalance: number;
 };
 
 export type GoogleSheetSyncPayload = {

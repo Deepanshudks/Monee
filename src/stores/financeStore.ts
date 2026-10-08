@@ -8,19 +8,25 @@ import {
   updateExpense,
   upsertExpense,
   clearExpenses,
+  clearExpensesForMonth,
 } from "@/database/expenseRepository";
 
-import { listBudgets, upsertBudget } from "@/database/budgetRepository";
+import {
+  listBudgets,
+  upsertBudget,
+  clearBudgets,
+} from "@/database/budgetRepository";
 
 export type MonthlyBudget = {
   budget: number;
-  startingBalance: number;
 };
 
 type FinanceState = {
   expenses: Expense[];
 
   monthlyBudgets: Record<string, MonthlyBudget>;
+
+  resetFinancialData: () => Promise<void>;
 
   hydrated: boolean;
 
@@ -38,11 +44,9 @@ type FinanceState = {
 
   clearAll: () => Promise<void>;
 
-  setMonthlyBudget: (
-    month: string,
-    budget: number,
-    startingBalance: number,
-  ) => Promise<void>;
+  clearMonth: (month: string) => Promise<void>;
+
+  setMonthlyBudget: (month: string, budget: number) => Promise<void>;
 };
 
 export const useFinanceStore = create<FinanceState>((set, get) => ({
@@ -63,7 +67,6 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
     for (const item of budgets) {
       monthlyBudgets[item.month] = {
         budget: item.amount,
-        startingBalance: item.startingBalance,
       };
     }
 
@@ -71,6 +74,16 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
       expenses,
       monthlyBudgets,
       hydrated: true,
+    });
+  },
+
+  resetFinancialData: async () => {
+    await clearExpenses();
+    await clearBudgets();
+
+    set({
+      expenses: [],
+      monthlyBudgets: {},
     });
   },
 
@@ -85,10 +98,9 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
 
     const newMonth: MonthlyBudget = {
       budget: Math.max(0, defaultBudget),
-      startingBalance: Math.max(0, defaultBudget),
     };
 
-    await upsertBudget(month, newMonth.budget, newMonth.startingBalance);
+    await upsertBudget(month, newMonth.budget, 0);
 
     set((state) => ({
       monthlyBudgets: {
@@ -144,26 +156,36 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
     }));
   },
 
-  clearAll: async () => {
-    await clearExpenses();
+  clearMonth: async (month) => {
+    await clearExpensesForMonth(month);
+
+    const expenses = await listExpenses();
 
     set({
-      expenses: [],
+      expenses,
     });
   },
 
-  setMonthlyBudget: async (month, budget, startingBalance) => {
-    const safeBudget = Math.max(0, budget);
-    const safeStartingBalance = Math.max(0, startingBalance);
+  clearAll: async () => {
+    await clearExpenses();
 
-    await upsertBudget(month, safeBudget, safeStartingBalance);
+    const expenses = await listExpenses();
+
+    set({
+      expenses,
+    });
+  },
+
+  setMonthlyBudget: async (month, budget) => {
+    const safeBudget = Math.max(0, budget);
+
+    await upsertBudget(month, safeBudget, 0);
 
     set((s) => ({
       monthlyBudgets: {
         ...s.monthlyBudgets,
         [month]: {
           budget: safeBudget,
-          startingBalance: safeStartingBalance,
         },
       },
     }));

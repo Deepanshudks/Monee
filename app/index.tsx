@@ -27,9 +27,20 @@ export default function Home() {
   const [picker, setPicker] = useState(false);
   const [editor, setEditor] = useState(false);
 
+  const budgetValues = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(monthlyBudgets).map(([key, value]) => [
+          key,
+          value.budget,
+        ]),
+      ),
+    [monthlyBudgets],
+  );
+
   const summary = useMemo(
-    () => monthlySummary(expenses, monthlyBudgets[month]?.budget ?? 0, month),
-    [expenses, monthlyBudgets, month],
+    () => monthlySummary(expenses, budgetValues, month),
+    [expenses, budgetValues, month],
   );
 
   const hydrated = useFinanceStore((s) => s.hydrated);
@@ -69,7 +80,7 @@ export default function Home() {
         <BalanceHeader
           budget={summary.budget}
           spent={summary.expenses}
-          startingBalance={monthlyBudgets[month]?.startingBalance ?? 0}
+          carryForward={summary.budget - (monthlyBudgets[month]?.budget ?? 0)}
         />
         <MonthSelector
           month={month}

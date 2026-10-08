@@ -5,7 +5,7 @@ import { AppText } from "@/components/ui/AppText";
 import { useFinanceStore } from "@/stores/financeStore";
 import { useTheme } from "@/hooks/useTheme";
 import { formatINR } from "@/utils/currency";
-import { categoryTotals } from "@/utils/calculations";
+import { categoryTotals, monthlySummary } from "@/utils/calculations";
 import { monthKey, monthLabel } from "@/utils/dates";
 import { MonthPicker } from "@/components/finance/MonthPicker";
 
@@ -18,8 +18,6 @@ export default function Insights() {
   const [month, setMonth] = useState(monthKey());
   const [picker, setPicker] = useState(false);
 
-  const monthFinance = monthlyBudgets[month];
-
   const cats = useMemo(
     () =>
       Object.entries(categoryTotals(expenses, month)).sort(
@@ -30,15 +28,31 @@ export default function Insights() {
 
   const spent = cats.reduce((sum, [, value]) => sum + value, 0);
 
-  const budget = monthFinance?.budget ?? 0;
-  const startingBalance = monthFinance?.startingBalance ?? 0;
+  const budgetValues = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(monthlyBudgets).map(([key, value]) => [
+          key,
+          value.budget,
+        ]),
+      ),
+    [monthlyBudgets],
+  );
 
-  const budgetRemaining = budget - spent;
-  const cashRemaining = startingBalance - spent;
+  const summary = useMemo(
+    () => monthlySummary(expenses, budgetValues, month),
+    [expenses, budgetValues, month],
+  );
+
+  const budget = summary.budget;
+  const budgetRemaining = summary.remaining;
+  const cashRemaining = summary.remaining;
 
   const budgetUsedPercent = budget > 0 ? Math.round((spent / budget) * 100) : 0;
 
   const budgetProgress = budget > 0 ? Math.min((spent / budget) * 100, 100) : 0;
+
+  const carryForward = budget - (monthlyBudgets[month]?.budget ?? 0);
 
   const selectedDate = new Date(`${month}-01`);
   const now = new Date();
@@ -164,7 +178,7 @@ export default function Insights() {
           ]}
         >
           <View style={s.financeItem}>
-            <AppText style={s.label}>STARTING BALANCE</AppText>
+            <AppText style={s.label}>BASE BUDGET</AppText>
 
             <AppText
               style={[
@@ -174,7 +188,7 @@ export default function Insights() {
                 },
               ]}
             >
-              {formatINR(startingBalance)}
+              {formatINR(monthlyBudgets[month]?.budget ?? 0)}
             </AppText>
           </View>
 
@@ -198,7 +212,7 @@ export default function Insights() {
                 },
               ]}
             >
-              {formatINR(cashRemaining)}
+              {formatINR(carryForward)}
             </AppText>
           </View>
         </View>

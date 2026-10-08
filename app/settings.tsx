@@ -14,6 +14,7 @@ import {
   Download,
   FileUp,
   Music2,
+  Sparkles,
   Trash2,
   UploadCloud,
   UserRound,
@@ -43,14 +44,21 @@ export default function Settings() {
   const importExpenses = useFinanceStore((s) => s.importExpenses);
   const clearAll = useFinanceStore((s) => s.clearAll);
   const monthlyBudgets = useFinanceStore((s) => s.monthlyBudgets);
+  const animeVoice = useSettingsStore((s) => s.animeVoiceEnabled);
 
-  const { play } = useAppSounds();
+  const setAnimeVoice = useSettingsStore((s) => s.setAnimeVoiceEnabled);
+  const { play, playVoice } = useAppSounds(sounds, animeVoice);
   const [saving, setSaving] = useState(false);
   const editName = (v: string) => setName(v);
   const editBudget = (v: string) => {
     const n = Number(v.replace(/[^0-9]/g, ""));
     if (Number.isFinite(n) && n >= 0) setBudget(n);
   };
+
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const clearMonth = useFinanceStore((s) => s.clearMonth);
+  const resetFinancialData = useFinanceStore((s) => s.resetFinancialData);
+
   const importFile = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
@@ -81,6 +89,10 @@ export default function Settings() {
       }
       await importExpenses(rows);
       play("success");
+
+      if (animeVoice) {
+        playVoice("yosh");
+      }
       Alert.alert(
         "Import complete",
         `${rows.length} expense${rows.length === 1 ? "" : "s"} imported.`,
@@ -104,6 +116,10 @@ export default function Settings() {
     try {
       await syncExpensesToGoogleSheet(webhook, expenses, monthlyBudgets);
       play("success");
+
+      if (animeVoice) {
+        playVoice("yosh");
+      }
       Alert.alert(
         "Synced",
         `${expenses.length} expenses are now in your Google Sheet.`,
@@ -117,18 +133,111 @@ export default function Settings() {
       setSaving(false);
     }
   };
-  const clear = () =>
-    Alert.alert("Clear all expenses?", "This cannot be undone.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Clear",
-        style: "destructive",
-        onPress: async () => {
+
+  const clear = () => {
+    const runClear = async (action: "month" | "all" | "reset") => {
+      try {
+        if (action === "month") {
+          await clearMonth(currentMonth);
+          play("tap");
+
+          Alert.alert(
+            "Expenses cleared",
+            "Your current month's expenses have been removed.",
+          );
+          return;
+        }
+
+        if (action === "all") {
           await clearAll();
           play("tap");
+
+          Alert.alert(
+            "Expenses cleared",
+            "All expense transactions have been removed.",
+          );
+          return;
+        }
+
+        await resetFinancialData();
+        play("tap");
+
+        Alert.alert(
+          "Financial data reset",
+          "Your expenses, budgets, and carry-forward data have been removed.",
+        );
+      } catch (error) {
+        console.error("[Monee] Clear operation failed:", error);
+
+        Alert.alert(
+          "Something went wrong",
+          error instanceof Error
+            ? error.message
+            : "Unable to complete this action.",
+        );
+      }
+    };
+
+    Alert.alert("Clear expenses", "Choose what you'd like to remove.", [
+      {
+        text: "Current month",
+        onPress: () => {
+          Alert.alert(
+            "Clear current month?",
+            `Remove all expenses recorded in ${currentMonth}?`,
+            [
+              { text: "Cancel", style: "cancel" },
+              {
+                text: "Clear month",
+                style: "destructive",
+                onPress: () => runClear("month"),
+              },
+            ],
+          );
         },
       },
+      {
+        text: "All expenses",
+        onPress: () => {
+          Alert.alert(
+            "Clear all expenses?",
+            "This will remove every expense transaction. Your monthly budgets will remain unchanged.",
+            [
+              { text: "Cancel", style: "cancel" },
+              {
+                text: "Clear all",
+                style: "destructive",
+                onPress: () => runClear("all"),
+              },
+            ],
+          );
+        },
+      },
+      {
+        text: "Reset financial data",
+        style: "destructive",
+        onPress: () => {
+          Alert.alert(
+            "Reset financial data?",
+            "This will permanently remove all expenses, monthly budgets, and carry-forward data from this device.",
+            [
+              { text: "Cancel", style: "cancel" },
+              {
+                text: "Reset everything",
+                style: "destructive",
+                onPress: () => runClear("reset"),
+              },
+            ],
+          );
+        },
+      },
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
     ]);
+  };
+
   return (
     <SafeAreaView style={[s.safe, { backgroundColor: t.background }]}>
       <ScrollView
@@ -188,8 +297,25 @@ export default function Settings() {
           >
             <Switch
               value={sounds}
-              onValueChange={(v) => setSounds(v)}
-              trackColor={{ false: t.border, true: t.accent }}
+              onValueChange={setSounds}
+              trackColor={{
+                false: t.border,
+                true: t.accent,
+              }}
+            />
+          </Row>
+
+          <Row
+            icon={<Sparkles size={18} color={t.accent} />}
+            label="Anime voice"
+          >
+            <Switch
+              value={animeVoice}
+              onValueChange={setAnimeVoice}
+              trackColor={{
+                false: t.border,
+                true: t.accent,
+              }}
             />
           </Row>
         </Section>
@@ -227,10 +353,10 @@ export default function Settings() {
             </View>
             <View style={s.actionText}>
               <AppText style={[s.actionTitle, { color: t.danger }]}>
-                Clear all expenses
+                Clear expenses
               </AppText>
               <AppText style={s.actionSub}>
-                Remove every transaction from this device
+                Choose what you want to remove
               </AppText>
             </View>
           </Pressable>
@@ -258,7 +384,9 @@ export default function Settings() {
             ]}
           />
         </Section>
-        <AppText style={s.version}>Monee · 1.1 · local-first finance</AppText>
+        <AppText style={s.version}>
+          Tracking money I pretend I have · Kuldeep
+        </AppText>
       </ScrollView>
     </SafeAreaView>
   );

@@ -10,6 +10,8 @@ type State = {
   soundsEnabled: boolean;
   onboardingComplete: boolean;
   hydrated: boolean;
+  animeVoiceEnabled: boolean;
+  setAnimeVoiceEnabled: (enabled: boolean) => void;
   hydrate: () => Promise<void>;
   setTheme: (theme: ThemeMode) => Promise<void>;
   setDefaultBudget: (n: number) => Promise<void>;
@@ -31,6 +33,8 @@ export const useSettingsStore = create<State>((set) => ({
   soundsEnabled: true,
   onboardingComplete: false,
   hydrated: false,
+  animeVoiceEnabled: true,
+  setAnimeVoiceEnabled: (enabled) => set({ animeVoiceEnabled: enabled }),
   hydrate: async () => set({ ...(await getSettings()), hydrated: true }),
   setTheme: async (theme) => {
     await setSetting("theme", theme);
